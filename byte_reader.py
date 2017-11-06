@@ -17,7 +17,6 @@ class MPS7Object(object):
         self.file_path = get_file_path(args[0]) if args else None
 
     def read_records(self):
-        print ''
         _file = open(self.file_path, 'rb')
         _bytes = _file.read()
         for idx, _byte in enumerate(_bytes):
@@ -38,6 +37,10 @@ class MPS7Object(object):
         print unpack('b', header[1])[0]
         print unpack('>I', header[2])[0]
 
+        print '---------------------------------------------------------------------------'
+        print 'byte  | kind          | timestamp           | user_id              | amt'
+        print '---------------------------------------------------------------------------'
+
         idx = 9
         while True:
             chunks = get_chunks(_bytes, idx, 1, 4, 8, 8)
@@ -46,18 +49,18 @@ class MPS7Object(object):
             record = Record(chunks, idx)
             idx = next_record_at(idx, record.get_kind())
             self.records.append(record)
+            print self.format_list_row(record)
         _file.close()
         return self
 
     @staticmethod
     def format_list_row(record):
-        print type(record.unpack_amount())
         template = '{} | {} | {} | {} | {}'
         result = template.format(
             str(record.index).rjust(5),
             record.get_kind().ljust(13),
             record.get_timestamp(),
-            record.get_user_id(),
+            str(record.get_user_id()).ljust(20),
             record.get_amount()
         )
         return result

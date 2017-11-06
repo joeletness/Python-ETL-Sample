@@ -69,8 +69,8 @@ class TestMPS7Object(TestCase):
 
         # 9   Debit         2014-02-22 16:42:25   4136353673894269217  604.27433556
 
-        print_he = ' byte | kind          | timestamp           | user_id             | amt'
-        expected = '    9 | Debit         | 2014-02-22 16:42:25 | 4136353673894269217 | 604.27'
+        print_he = ' byte | kind          | timestamp           | user_id              | amt'
+        expected = '    9 | Debit         | 2014-02-22 16:42:25 | 4136353673894269217  | 604.27'
         obj = MPS7Object('data.dat')
         obj.read_records()
 
