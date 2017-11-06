@@ -3,8 +3,12 @@ import time
 from datetime import datetime
 from struct import pack
 from decimal import Decimal
-from byte_reader import MPS7Object, Record, parse_data_spike, get_chunks, float_to_currency
-from byte_reader import next_record_at
+from byte_reader import MPS7Data, Record, get_chunks, float_to_currency, User
+from byte_reader import next_record_at, main, format_readable_data_row
+
+
+def test_main():
+    main()
 
 
 def test_get_chunks__when_passed_blob_with_start_and_chunk_size__returns_chunks():
@@ -20,24 +24,14 @@ def test_get_chunks__when_passed_blob_with_start_and_chunk_size__returns_chunks(
 
 def test_get_chunks__when_start_index_out_of_range__returns_none():
     blob = 'pearcowtomatotunabeeorange'
-    start_index = 45
+    start_index = 26
     result = get_chunks(blob, start_index, 4, 3, 6)
     assert result == []
 
 
-def test_parse_data_spike():
-    obj = MPS7Object('data.dat')
-    parse_data_spike(obj)
-    assert len(obj.records) == 92
-    assert obj.records[0].chunks
-    assert 'Credit' in obj.records[0].get_kind()
-    print
-
-
-def test_float_to_currency__converts_double_to_decimal_with_two_places():
+def test_float_to_currency__converts_float_to_decimal_with_two_places():
     assert str(float_to_currency(384.61670768)) == '384.62'
     assert float_to_currency(384.61670768) == Decimal('384.62')
-    foo = float_to_currency(384.61670768)
 
 
 def test_next_offest__when_debit_or_credit__return_location_of_next_record_21_bytes_ahead():
@@ -49,33 +43,74 @@ def test_next_offest__when_not_debit_or_credit__return_location_of_next_record_1
     assert next_record_at(30, 'Not Credit') == 43
 
 
-class TestMPS7Object(TestCase):
-    def test_read_records(self):
-        obj = MPS7Object('data.dat')
-        obj.read_records()
-        assert len(obj.records) == 88
+def test_format_readable_data_row():
+    expected = '    9 | Debit         | 2014-02-22 16:42:25 | 4136353673894269217  | 604.27'
+    obj = MPS7Data('data.dat')
+    obj.read_data_from_file()
+    result = format_readable_data_row(obj.records[0])
+    assert result == expected
 
-    def test_read_records_alt(self):
-        obj = MPS7Object('data.dat')
-        obj.read_records_alt()
+
+class TestMPS7Object(TestCase):
+    def test_read_data_from_file(self):
+        obj = MPS7Data('data.dat')
+        obj.read_data_from_file()
         assert len(obj.records) == 72
 
-    # def test_set_header(self):
-    #     obj = MPS7Object('data.dat')
-    #     obj.read_records_alt()
-    #     assert obj.count == 71
+    def test_update_stats__counts_occurrences_of_each_record_type(self):
+        obj = MPS7Data('data.dat')
+        obj.read_data_from_file()
+        assert obj.stats['kindCount']['Debit'] == 36
+        assert obj.stats['kindCount']['Credit'] == 18
+        assert obj.stats['kindCount']['StartAutopay'] == 10
+        assert obj.stats['kindCount']['EndAutopay'] == 8
 
-    def test_format_list_row(self):
+    def test_update_stats__accumulates_credits(self):
+        obj = MPS7Data('data.dat')
+        obj.read_data_from_file()
+        assert obj.stats['amountTotals']['Credit'] == Decimal('10073.34')
 
-        # 9   Debit         2014-02-22 16:42:25   4136353673894269217  604.27433556
+    def test_update_stats__accumulates_debits(self):
+        obj = MPS7Data('data.dat')
+        obj.read_data_from_file()
+        assert obj.stats['amountTotals']['Debit'] == Decimal('18203.69')
 
-        print_he = ' byte | kind          | timestamp           | user_id              | amt'
-        expected = '    9 | Debit         | 2014-02-22 16:42:25 | 4136353673894269217  | 604.27'
-        obj = MPS7Object('data.dat')
-        obj.read_records()
+    def test_update_stats__accumulates_users_debits_and_credits(self):
+        obj = MPS7Data('data.dat')
+        obj.read_data_from_file()
+        user = obj.stats['users'].get('3018469034978866138')
+        assert user.current_balance == Decimal('154.66')
 
-        result = obj.format_list_row(obj.records[0])
-        assert result == expected
+    def test_upsert_user__inserts_user_object_in_stats(self):
+        obj = MPS7Data('data.dat')
+        obj.read_data_from_file()
+        assert isinstance(obj.stats['users']['3018469034978866138'], User)
+
+
+class TestUser(TestCase):
+    def test_user_has_id(self):
+        user = User('some-id')
+        assert user.user_id == 'some-id'
+
+    def test_accumulate_amount__can_add_to_sum_of_credit(self):
+        user = User('foo')
+        user.accumulate_amount('Credit', 100)
+        assert user.credit_sum == 100
+        user.accumulate_amount('Credit', 50)
+        assert user.credit_sum == 150
+
+    def test_accumulate_amount__can_add_to_sum_of_Debit(self):
+        user = User('foo')
+        user.accumulate_amount('Debit', 100)
+        assert user.debit_sum == 100
+        user.accumulate_amount('Debit', 50)
+        assert user.debit_sum == 150
+
+    def test_current_balance__return_user_balance(self):
+        user = User('foo')
+        user.accumulate_amount('Credit', 100)
+        user.accumulate_amount('Debit', 50)
+        assert user.current_balance == 50
 
 
 class TestRecord(TestCase):
@@ -83,9 +118,9 @@ class TestRecord(TestCase):
         chunks = ['kind-byte', 'timestamp-bytes', 'user_id-bytes','amount-bytes']
         record = Record(chunks)
         assert record.chunks['kind'] == 'kind-byte'
-        assert record._timestamp == 'timestamp-bytes'
-        assert record._user_id == 'user_id-bytes'
-        assert record._amount == 'amount-bytes'
+        assert record.chunks['timestamp'] == 'timestamp-bytes'
+        assert record.chunks['user_id'] == 'user_id-bytes'
+        assert record.chunks['amount'] == 'amount-bytes'
 
     def test_unpack_kind__returns_unpacked_value(self):
         record = Record()
@@ -138,3 +173,18 @@ class TestRecord(TestCase):
         record.chunks['kind'] = pack('b', 1)
         record.chunks['amount'] = pack('>d', 42.4)
         assert record.get_amount() == Decimal('42.40')
+
+    def test_is_transaction__when_record_is_debit_or_credit__return_true(self):
+        record = Record()
+        record.chunks['kind'] = pack('b', 0)
+        assert record.is_transaction is True
+        record.chunks['kind'] = pack('b', 1)
+        assert record.is_transaction is True
+
+    def test_is_transaction__when_record_auto_payment_update__return_False(self):
+        record = Record()
+        record.chunks['kind'] = pack('b', 2)
+        assert record.is_transaction is False
+        record.chunks['kind'] = pack('b', 3)
+        assert record.is_transaction is False
+

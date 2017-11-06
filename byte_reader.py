@@ -1,45 +1,48 @@
 #!/usr/bin/python
 import os
 from datetime import datetime
-from decimal import Decimal, ROUND_HALF_EVEN, getcontext, ROUND_HALF_DOWN, InvalidOperation
-import struct
+from decimal import Decimal, ROUND_HALF_EVEN
 from struct import unpack
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
-class MPS7Object(object):
+class MPS7Data(object):
     def __init__(self, *args, **kwargs):
-        self.format = None
-        self.version = None
-        self.count = None
         self.records = []
         self.file_path = get_file_path(args[0]) if args else None
+        self.stats = {
+            'kindCount': {
+                'Debit': 0,
+                'Credit': 0,
+                'StartAutopay': 0,
+                'EndAutopay': 0
+            },
+            'amountTotals': {
+                'Debit': float_to_currency(0.0),
+                'Credit': float_to_currency(0.0),
+            },
+            'users': {}
+        }
 
-    def read_records(self):
+    def update_stats(self, record):
+        user = self.upsert_user(record)
+        kind = record.get_kind()
+        self.stats['kindCount'][kind] += 1
+        if kind in ('Credit', 'Debit'):
+            self.stats['amountTotals'][kind] += record.get_amount()
+            user.accumulate_amount(kind, record.get_amount())
+
+    def upsert_user(self, record):
+        user_id = str(record.get_user_id())
+        user = self.stats['users'].get(user_id)
+        if not user:
+            self.stats['users'][user_id] = user = User(user_id)
+        return user
+
+    def read_data_from_file(self):
         _file = open(self.file_path, 'rb')
         _bytes = _file.read()
-        for idx, _byte in enumerate(_bytes):
-            if idx >= 9:
-                value = struct.unpack('b', _byte)[0]
-                if value in (0, 1, 2, 3):
-                    record = Record(get_chunks(_bytes, idx, 1, 4, 8, 8), idx)
-                    self.records.append(record)
-        _file.close()
-        return self
-
-    def read_records_alt(self):
-        _file = open(self.file_path, 'rb')
-        _bytes = _file.read()
-
-        header = get_chunks(_bytes, 0, 4, 1, 4)
-        print ''.join(unpack('cccc', header[0]))
-        print unpack('b', header[1])[0]
-        print unpack('>I', header[2])[0]
-
-        print '---------------------------------------------------------------------------'
-        print 'byte  | kind          | timestamp           | user_id              | amt'
-        print '---------------------------------------------------------------------------'
 
         idx = 9
         while True:
@@ -48,22 +51,10 @@ class MPS7Object(object):
                 break
             record = Record(chunks, idx)
             idx = next_record_at(idx, record.get_kind())
+            self.update_stats(record)
             self.records.append(record)
-            print self.format_list_row(record)
-        _file.close()
-        return self
 
-    @staticmethod
-    def format_list_row(record):
-        template = '{} | {} | {} | {} | {}'
-        result = template.format(
-            str(record.index).rjust(5),
-            record.get_kind().ljust(13),
-            record.get_timestamp(),
-            str(record.get_user_id()).ljust(20),
-            record.get_amount()
-        )
-        return result
+        _file.close()
 
 
 def next_record_at(current_position, record_kind):
@@ -72,14 +63,26 @@ def next_record_at(current_position, record_kind):
     return current_position + 13
 
 
+class User(object):
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.credit_sum = float_to_currency(0.0)
+        self.debit_sum = float_to_currency(0.0)
+
+    def accumulate_amount(self, kind, amount):
+        if kind == 'Credit':
+            self.credit_sum += amount
+        elif kind == 'Debit':
+            self.debit_sum += amount
+
+    @property
+    def current_balance(self):
+        return self.credit_sum - self.debit_sum
+
+
 class Record(object):
     def __init__(self, chunks=None, index=None):
         self.index = index
-        self._kind = chunks[0] if chunks else None
-        self._timestamp = chunks[1] if chunks else None
-        self._user_id = chunks[2] if chunks else None
-        self._amount = chunks[3] if chunks else None
-
         if chunks:
             self.chunks = {
                 'kind': chunks[0],
@@ -90,19 +93,16 @@ class Record(object):
         else:
             self.chunks = {}
 
-        self.kind = None
-        self.timestamp = None
-        self.user_id = None
-        self.amount = None
-
     def get_timestamp(self):
         if self.unpack_timestamp():
             return datetime.fromtimestamp(self.unpack_timestamp())
 
+    @property
+    def is_transaction(self):
+        return self.get_kind() in ('Credit', 'Debit')
+
     def get_kind(self):
         _kind = self.unpack_kind()
-        if _kind is None:
-            _kind = self.kind
         return (
             'Debit',
             'Credit',
@@ -111,8 +111,6 @@ class Record(object):
         )[_kind]
 
     def get_amount(self):
-        if self.amount is not None:
-            return self.amount
         amount = self.unpack_amount()
         return float_to_currency(amount) if amount else None
 
@@ -142,7 +140,7 @@ def get_file_path(file_name):
 
 def get_chunks(_bytes, start, *args):
     result = []
-    for size in args:
+    for index, size in enumerate(args):
         end = start + size
         _byte = _bytes[start:end]
         if not _byte:
@@ -156,34 +154,39 @@ def float_to_currency(value):
     return Decimal(Decimal(value).quantize(Decimal('.00'), rounding=ROUND_HALF_EVEN))
 
 
-def parse_data_spike(obj):
-    _file = open(obj.file_path, 'rb')
-    _bytes = _file.read()
-    obj.records = []
+def format_readable_data_row(record):
+    template = '{} | {} | {} | {} | {}'
+    result = template.format(
+        str(record.index).rjust(5),
+        record.get_kind().ljust(13),
+        record.get_timestamp(),
+        str(record.get_user_id()).ljust(20),
+        str(record.get_amount()).rjust(6)
+    )
+    return result
 
-    print '--------------DATA READ FROM FILE ----------------'
-    for idx, _byte in enumerate(_bytes):
-        value = struct.unpack('b', _byte)[0]
-        if value in (0, 1, 2, 3):
-            rs = get_chunks(_bytes, idx, 1, 4, 8, 8)
-            record = Record(rs)
-            record.kind = unpack('b', rs[0])[0]
-            record.timestamp = datetime.fromtimestamp(unpack('>I', rs[1])[0])
-            record.user_id = unpack('>Q', rs[2])[0]
-            record.amount = round(unpack('>d', rs[3])[0], 8)
 
-            _record_array = [
-                unpack('b', rs[0])[0],
-                datetime.fromtimestamp(unpack('>I', rs[1])[0]),
-                unpack('>Q', rs[2])[0]
-            ]
-            if value in (0, 1):
-                amount = round(unpack('>d', rs[3])[0], 2)
-                _record_array.append(amount)
+def main(show_table=False):
+    obj = MPS7Data('data.dat')
+    obj.read_data_from_file()
 
-            # print str(idx).rjust(5), ' ', record.get_kind().ljust(13), record.timestamp, ' ', str(record.user_id).ljust(20), record.get_amount()
-            obj.records.append(record)
+    if show_table:
+        print '---------------------------------------------------------------------------'
+        print 'byte  | kind          | timestamp           | user_id              | amt'
+        print '---------------------------------------------------------------------------'
+        for record in obj.records:
+            print format_readable_data_row(record)
 
-    _file.close()
+    print '---------------------------------------------------------------------------'
+    print '   Total debit amount | ${}'.format(obj.stats['amountTotals']['Debit'])
+    print '  Total credit amount | ${}'.format(obj.stats['amountTotals']['Credit'])
+    print 'Total autopay started | {}'.format(obj.stats['kindCount']['StartAutopay'])
+    print '  Total autopay ended | {}'.format(obj.stats['kindCount']['EndAutopay'])
+    print '---------------------------------------------------------------------------'
 
-    return obj
+    user = obj.stats['users'].get('2456938384156277127')
+    print 'Balance for User 2456938384156277127 is ${}'.format(user.current_balance)
+
+
+if __name__ == '__main__':
+    main()
