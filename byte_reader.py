@@ -71,43 +71,30 @@ class Record(object):
         else:
             self.chunks = {}
 
-    def unpack_kind(self):
-        packed = self.chunks.get('kind')
-        return unpack('b', packed)[0] if packed else None
-
-    def unpack_timestamp(self):
-        packed = self.chunks.get('timestamp')
-        return unpack('>I', packed)[0] if packed else None
-
-    def unpack_user_id(self):
-        packed = self.chunks.get('user_id')
-        return unpack('>Q', packed)[0] if packed else None
-
-    def unpack_amount(self):
-        packed = self.chunks.get('amount')
-        return unpack('>d', packed)[0] if packed else None
-
     @property
     def kind(self):
-        _kind = self.unpack_kind()
+        kind = unpack('b', self.chunks.get('kind'))[0]
         return (
             'Debit',
             'Credit',
             'StartAutopay',
             'EndAutopay'
-        )[_kind]
+        )[kind]
 
     @property
     def timestamp(self):
-        return datetime.fromtimestamp(self.unpack_timestamp())
+        unpacked = unpack('>I', self.chunks.get('timestamp'))[0]
+        return datetime.fromtimestamp(unpacked)
 
     @property
     def user_id(self):
-        return self.unpack_user_id()
+        packed = self.chunks.get('user_id')
+        return unpack('>Q', packed)[0] if packed else None
 
     @property
     def amount(self):
-        return float_to_currency(self.unpack_amount())
+        unpacked = unpack('>d', self.chunks.get('amount'))[0]
+        return float_to_currency(unpacked)
 
 
 class User(object):

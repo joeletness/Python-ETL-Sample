@@ -7,14 +7,14 @@ from byte_reader import MPS7Data, Record, get_chunks, float_to_currency, User
 from byte_reader import next_record_at, main, format_readable_data_row
 
 
-class TestMPS7Object(TestCase):
+class TestMPS7Data(TestCase):
     def test_extract_and_transform__reads_data_creates_new_records_and_users(self):
         obj = MPS7Data('data.dat')
         obj.extract_and_transform()
         assert len(obj.records) == 72
         assert len(obj.users) == 62
 
-    def test_update_stats__counts_occurrences_of_start_and_end_autopays(self):
+    def test_update_stats__counts_occurrences_of_start_and_end_autopay_records(self):
         obj = MPS7Data('data.dat')
         obj.extract_and_transform()
         assert obj.stats['kindCount']['StartAutopay'] == 10
@@ -51,27 +51,6 @@ class TestRecord(TestCase):
         assert record.chunks['timestamp'] == 'timestamp-chunk'
         assert record.chunks['user_id'] == 'user_id-chunk'
         assert record.chunks['amount'] == 'amount-chunk'
-
-    def test_unpack_kind__return_int(self):
-        record = Record()
-        record.chunks['kind'] = pack('b', 2)
-        assert record.unpack_kind() == 2
-
-    def test_unpack_timestamp__return_timestamp_integer(self):
-        fake_timestamp_int = int(time.mktime(datetime.now().timetuple()))
-        record = Record()
-        record.chunks['timestamp'] = pack('>I', fake_timestamp_int)
-        assert record.unpack_timestamp() == fake_timestamp_int
-
-    def test_unpack_user_id__return_user_id_integer(self):
-        record = Record()
-        record.chunks['user_id'] = pack('>Q', 2456938384156277127)
-        assert record.unpack_user_id() == 2456938384156277127
-
-    def test_unpack_amount__return_float(self):
-        record = Record()
-        record.chunks['amount'] = pack('>d', 42.473264)
-        assert record.unpack_amount() == 42.473264
 
     def test_kind_property__return_readable_value(self):
         record = Record()
@@ -162,5 +141,5 @@ def test_format_readable_data_row():
     assert result == expected
 
 
-# def test_main():
-#     main(True)
+def test_main():
+    main(True)
