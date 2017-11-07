@@ -7,7 +7,7 @@ from struct import unpack
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
-class MPS7Data(object):
+class MPS7(object):
     def __init__(self, file_name):
         self.records = []
         self.users = {}
@@ -22,14 +22,17 @@ class MPS7Data(object):
                 'Credit': float_to_currency(0.0),
             }
         }
+        self._extract_and_transform()
 
-    def extract_and_transform(self):
-        _file = open(self.file_path, 'rb')
-        _bytes = _file.read()
+    def _extract_and_transform(self):
+        open_file = open(self.file_path, 'rb')
+        bytes_ = open_file.read()
+        data_format = ''.join(unpack('4c', bytes_[0:4]))
+        assert data_format == 'MPS7', 'Data must be MPS7'
 
         idx = 9
         while True:
-            chunks = get_chunks(_bytes, idx, 1, 4, 8, 8)
+            chunks = get_chunks(bytes_, idx, 1, 4, 8, 8)
             if not chunks:
                 break
             record = Record(chunks, idx)
@@ -37,7 +40,7 @@ class MPS7Data(object):
             self.update_stats(record)
             self.records.append(record)
 
-        _file.close()
+        open_file.close()
 
     def update_stats(self, record):
         user = self.upsert_user(record)
@@ -148,16 +151,14 @@ def format_readable_data_row(record):
     return result
 
 
-def main(show_table=True):
-    obj = MPS7Data('data.dat')
-    obj.extract_and_transform()
+def main(filename):
+    obj = MPS7(filename)
 
-    if show_table:
-        print '---------------------------------------------------------------------------'
-        print 'byte  | kind          | timestamp           | user_id              | amt'
-        print '---------------------------------------------------------------------------'
-        for record in obj.records:
-            print format_readable_data_row(record)
+    print '---------------------------------------------------------------------------'
+    print 'byte  | kind          | timestamp           | user_id              | amt'
+    print '---------------------------------------------------------------------------'
+    for record in obj.records:
+        print format_readable_data_row(record)
 
     print '---------------------------------------------------------------------------'
     print '   Total debit amount | ${}'.format(obj.stats['amountTotals']['Debit'])
@@ -171,4 +172,6 @@ def main(show_table=True):
 
 
 if __name__ == '__main__':
-    main()
+    filename = os.sys.argv[1] if len(os.sys.argv) > 1 else None
+    assert filename, 'Data filename is required'
+    main(filename)

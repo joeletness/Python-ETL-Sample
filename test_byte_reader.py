@@ -1,45 +1,44 @@
 from unittest import TestCase
+import pytest
 import time
 from datetime import datetime
 from struct import pack
 from decimal import Decimal
-from byte_reader import MPS7Data, Record, get_chunks, float_to_currency, User
+from byte_reader import MPS7, Record, get_chunks, float_to_currency, User
 from byte_reader import next_record_at, main, format_readable_data_row
 
 
-class TestMPS7Data(TestCase):
-    def test_extract_and_transform__reads_data_creates_new_records_and_users(self):
-        obj = MPS7Data('data.dat')
-        obj.extract_and_transform()
+class TestMPS7Integration(TestCase):
+    def test_extract_and_transform__when_file_is_not_found__raise_exception(self):
+        with pytest.raises(IOError):
+            MPS7('not-found.dat')
+
+    def test_extract_and_transform__when_data_is_mps7__read_data_populate_records_and_users(self):
+        obj = MPS7('data.dat')
         assert len(obj.records) == 72
         assert len(obj.users) == 62
 
     def test_update_stats__counts_occurrences_of_start_and_end_autopay_records(self):
-        obj = MPS7Data('data.dat')
-        obj.extract_and_transform()
+        obj = MPS7('data.dat')
         assert obj.stats['kindCount']['StartAutopay'] == 10
         assert obj.stats['kindCount']['EndAutopay'] == 8
 
     def test_update_stats__accumulates_credits_and_debits(self):
-        obj = MPS7Data('data.dat')
-        obj.extract_and_transform()
+        obj = MPS7('data.dat')
         assert obj.stats['amountTotals']['Credit'] == Decimal('10073.34')
         assert obj.stats['amountTotals']['Debit'] == Decimal('18203.69')
 
     def test_update_stats__accumulates_debits(self):
-        obj = MPS7Data('data.dat')
-        obj.extract_and_transform()
+        obj = MPS7('data.dat')
         assert obj.stats['amountTotals']['Debit'] == Decimal('18203.69')
 
     def test_update_stats__accumulates_users_debits_and_credits(self):
-        obj = MPS7Data('data.dat')
-        obj.extract_and_transform()
+        obj = MPS7('data.dat')
         user = obj.users.get('3018469034978866138')
         assert user.current_balance == Decimal('154.66')
 
     def test_upsert_user__inserts_user_object_in_stats(self):
-        obj = MPS7Data('data.dat')
-        obj.extract_and_transform()
+        obj = MPS7('data.dat')
         assert isinstance(obj.users.get('3018469034978866138'), User)
 
 
@@ -133,13 +132,8 @@ def test_float_to_currency__converts_float_to_decimal_with_two_places():
     assert float_to_currency(384.61670768) == Decimal('384.62')
 
 
-def test_format_readable_data_row():
-    expected = '    9 | Debit         | 2014-02-22 16:42:25 | 4136353673894269217  | 604.27'
-    obj = MPS7Data('data.dat')
-    obj.extract_and_transform()
+def test_format_readable_data_row__return_readable_data_row_for_output():
+    obj = MPS7('data.dat')
     result = format_readable_data_row(obj.records[0])
+    expected = '    9 | Debit         | 2014-02-22 16:42:25 | 4136353673894269217  | 604.27'
     assert result == expected
-
-
-def test_main():
-    main(True)
