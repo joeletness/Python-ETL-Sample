@@ -4,35 +4,35 @@ import time
 from datetime import datetime
 from struct import pack
 from decimal import Decimal
-from byte_reader import MPS7, Record, get_chunks, float_to_currency, User
-from byte_reader import next_record_at, main, format_readable_data_row
+from byte_reader import MPS7, LogEntry, get_chunks, float_to_currency, User
+from byte_reader import next_log_entry_at, main, format_readable_data_row
 
 
 class TestMPS7Integration(TestCase):
-    def test_extract_and_transform__when_file_is_not_found__raise_exception(self):
+    def test__extract_transform_load__when_file_is_not_found__raise_exception(self):
         with pytest.raises(IOError):
             MPS7('not-found.dat')
 
-    def test_extract_and_transform__when_data_is_mps7__read_data_populate_records_and_users(self):
+    def test__extract_transform_load__when_data_is_mps7__read_data_populate_log_entrys_and_users(self):
         obj = MPS7('data.dat')
-        assert len(obj.records) == 72
+        assert len(obj.log_entries) == 72
         assert len(obj.users) == 62
 
-    def test_update_stats__counts_occurrences_of_start_and_end_autopay_records(self):
+    def test_update_aggregate__counts_occurrences_of_start_and_end_autopay_log_entrys(self):
         obj = MPS7('data.dat')
-        assert obj.stats['kindCount']['StartAutopay'] == 10
-        assert obj.stats['kindCount']['EndAutopay'] == 8
+        assert obj.aggregate['autopayCount']['StartAutopay'] == 10
+        assert obj.aggregate['autopayCount']['EndAutopay'] == 8
 
-    def test_update_stats__accumulates_credits_and_debits(self):
+    def test_update_aggregate__accumulates_credits_and_debits(self):
         obj = MPS7('data.dat')
-        assert obj.stats['amountTotals']['Credit'] == Decimal('10073.34')
-        assert obj.stats['amountTotals']['Debit'] == Decimal('18203.69')
+        assert obj.aggregate['amountTotals']['Credit'] == Decimal('10073.34')
+        assert obj.aggregate['amountTotals']['Debit'] == Decimal('18203.69')
 
-    def test_update_stats__accumulates_debits(self):
+    def test_update_aggregate__accumulates_debits(self):
         obj = MPS7('data.dat')
-        assert obj.stats['amountTotals']['Debit'] == Decimal('18203.69')
+        assert obj.aggregate['amountTotals']['Debit'] == Decimal('18203.69')
 
-    def test_update_stats__accumulates_users_debits_and_credits(self):
+    def test_update_aggregate__accumulates_users_debits_and_credits(self):
         obj = MPS7('data.dat')
         user = obj.users.get('3018469034978866138')
         assert user.current_balance == Decimal('154.66')
@@ -42,37 +42,37 @@ class TestMPS7Integration(TestCase):
         assert isinstance(obj.users.get('3018469034978866138'), User)
 
 
-class TestRecord(TestCase):
+class TestLogEntry(TestCase):
     def test__when_constructed_with_given_chunks__populates_chunk_dictionary(self):
         chunks = ['kind-chunk', 'timestamp-chunk', 'user_id-chunk','amount-chunk']
-        record = Record(chunks)
-        assert record.chunks['kind'] == 'kind-chunk'
-        assert record.chunks['timestamp'] == 'timestamp-chunk'
-        assert record.chunks['user_id'] == 'user_id-chunk'
-        assert record.chunks['amount'] == 'amount-chunk'
+        log_entry = LogEntry(chunks)
+        assert log_entry.chunks['kind'] == 'kind-chunk'
+        assert log_entry.chunks['timestamp'] == 'timestamp-chunk'
+        assert log_entry.chunks['user_id'] == 'user_id-chunk'
+        assert log_entry.chunks['amount'] == 'amount-chunk'
 
     def test_kind_property__return_readable_value(self):
-        record = Record()
-        record.chunks['kind'] = pack('b', 0)
-        assert record.kind == 'Debit'
+        log_entry = LogEntry()
+        log_entry.chunks['kind'] = pack('b', 0)
+        assert log_entry.kind == 'Debit'
 
     def test_timestamp_property__return_expected_datetime_object(self):
         expected = datetime(2017, 11, 5)
         fake_timestamp_int = int(time.mktime(expected.timetuple()))
-        record = Record()
-        record.chunks['timestamp'] = pack('>I', fake_timestamp_int)
-        assert record.timestamp == expected
+        log_entry = LogEntry()
+        log_entry.chunks['timestamp'] = pack('>I', fake_timestamp_int)
+        assert log_entry.timestamp == expected
 
     def test_user_id_property__return_user_id_int(self):
-        record = Record()
-        record.chunks['user_id'] = pack('>Q', 2456938384156277127)
-        assert record.user_id == 2456938384156277127
+        log_entry = LogEntry()
+        log_entry.chunks['user_id'] = pack('>Q', 2456938384156277127)
+        assert log_entry.user_id == 2456938384156277127
 
     def test_amount_property__return_decimal_value(self):
-        record = Record()
-        record.chunks['kind'] = pack('b', 1)
-        record.chunks['amount'] = pack('>d', 42.4)
-        assert record.amount == Decimal('42.40')
+        log_entry = LogEntry()
+        log_entry.chunks['kind'] = pack('b', 1)
+        log_entry.chunks['amount'] = pack('>d', 42.4)
+        assert log_entry.amount == Decimal('42.40')
 
 
 class TestUser(TestCase):
@@ -119,13 +119,13 @@ def test_get_chunks__when_start_index_out_of_range__return_none():
     assert result == []
 
 
-def test_next_offest__when_debit_or_credit__return_location_of_next_record_21_bytes_ahead():
-    assert next_record_at(30, 'Credit') == 51
-    assert next_record_at(30, 'Debit') == 51
+def test_next_offest__when_debit_or_credit__return_location_of_next_log_entry_21_bytes_ahead():
+    assert next_log_entry_at(30, 'Credit') == 51
+    assert next_log_entry_at(30, 'Debit') == 51
 
 
-def test_next_offest__when_not_debit_or_credit__return_location_of_next_record_13_bytes_ahead():
-    assert next_record_at(30, 'Not Credit') == 43
+def test_next_offest__when_not_debit_or_credit__return_location_of_next_log_entry_13_bytes_ahead():
+    assert next_log_entry_at(30, 'Not Credit') == 43
 
 
 def test_float_to_currency__converts_float_to_decimal_with_two_places():
@@ -134,6 +134,6 @@ def test_float_to_currency__converts_float_to_decimal_with_two_places():
 
 def test_format_readable_data_row__return_readable_data_row_for_output():
     obj = MPS7('data.dat')
-    result = format_readable_data_row(obj.records[0])
+    result = format_readable_data_row(obj.log_entries[0])
     expected = '    9 | Debit         | 2014-02-22 16:42:25 | 4136353673894269217  | 604.27'
     assert result == expected

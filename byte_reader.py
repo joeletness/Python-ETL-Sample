@@ -9,11 +9,11 @@ BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class MPS7(object):
     def __init__(self, file_name):
-        self.records = []
+        self.log_entries = []
         self.users = {}
         self.file_path = os.path.join(BASE_DIR, file_name)
-        self.stats = {
-            'kindCount': {
+        self.aggregate = {
+            'autopayCount': {
                 'StartAutopay': 0,
                 'EndAutopay': 0
             },
@@ -22,46 +22,46 @@ class MPS7(object):
                 'Credit': float_to_currency(0.0),
             }
         }
-        self._extract_and_transform()
+        self._extract_transform_load()
 
-    def _extract_and_transform(self):
+    def _extract_transform_load(self):
         open_file = open(self.file_path, 'rb')
         bytes_ = open_file.read()
         data_format = ''.join(unpack('4c', bytes_[0:4]))
         assert data_format == 'MPS7', 'Data must be MPS7'
 
-        idx = 9
+        start_byte = 9
         while True:
-            chunks = get_chunks(bytes_, idx, 1, 4, 8, 8)
+            chunks = get_chunks(bytes_, start_byte, 1, 4, 8, 8)
             if not chunks:
                 break
-            record = Record(chunks, idx)
-            idx = next_record_at(idx, record.kind)
-            self.update_stats(record)
-            self.records.append(record)
+            log_entry = LogEntry(chunks, start_byte)
+            start_byte = next_log_entry_at(start_byte, log_entry.kind)
+            self.update_aggregate(log_entry)
+            self.log_entries.append(log_entry)
 
         open_file.close()
 
-    def update_stats(self, record):
-        user = self.upsert_user(record)
-        kind = record.kind
+    def update_aggregate(self, log_entry):
+        user = self.upsert_user(log_entry)
+        kind = log_entry.kind
 
         if kind in ('StartAutopay', 'EndAutopay'):
-            self.stats['kindCount'][kind] += 1
+            self.aggregate['autopayCount'][kind] += 1
 
         if kind in ('Credit', 'Debit'):
-            self.stats['amountTotals'][kind] += record.amount
-            user.accumulate_amount(kind, record.amount)
+            self.aggregate['amountTotals'][kind] += log_entry.amount
+            user.accumulate_amount(kind, log_entry.amount)
 
-    def upsert_user(self, record):
-        user_id = str(record.user_id)
+    def upsert_user(self, log_entry):
+        user_id = str(log_entry.user_id)
         user = self.users.get(user_id)
         if not user:
             self.users[user_id] = user = User(user_id)
         return user
 
 
-class Record(object):
+class LogEntry(object):
     def __init__(self, chunks=None, index=None):
         self.index = index
         if chunks:
@@ -121,16 +121,16 @@ def get_chunks(_bytes, start, *args):
     result = []
     for index, size in enumerate(args):
         end = start + size
-        _byte = _bytes[start:end]
-        if not _byte:
+        chunk = _bytes[start:end]
+        if not chunk:
             return []
-        result.append(_byte)
+        result.append(chunk)
         start += size
     return result
 
 
-def next_record_at(current_position, record_kind):
-    if record_kind in ('Credit', 'Debit'):
+def next_log_entry_at(current_position, log_entry_kind):
+    if log_entry_kind in ('Credit', 'Debit'):
         return current_position + 21
     return current_position + 13
 
@@ -139,32 +139,32 @@ def float_to_currency(value):
     return Decimal(Decimal(value).quantize(Decimal('.00'), rounding=ROUND_HALF_EVEN))
 
 
-def format_readable_data_row(record):
+def format_readable_data_row(log_entry):
     template = '{} | {} | {} | {} | {}'
     result = template.format(
-        str(record.index).rjust(5),
-        record.kind.ljust(13),
-        record.timestamp,
-        str(record.user_id).ljust(20),
-        str(record.amount).rjust(6)
+        str(log_entry.index).rjust(5),
+        log_entry.kind.ljust(13),
+        log_entry.timestamp,
+        str(log_entry.user_id).ljust(20),
+        str(log_entry.amount).rjust(6)
     )
     return result
 
 
-def main(filename):
-    obj = MPS7(filename)
+def main(file_name):
+    obj = MPS7(file_name)
 
     print '---------------------------------------------------------------------------'
     print 'byte  | kind          | timestamp           | user_id              | amt'
     print '---------------------------------------------------------------------------'
-    for record in obj.records:
-        print format_readable_data_row(record)
+    for log_entry in obj.log_entries:
+        print format_readable_data_row(log_entry)
 
     print '---------------------------------------------------------------------------'
-    print '   Total debit amount | ${}'.format(obj.stats['amountTotals']['Debit'])
-    print '  Total credit amount | ${}'.format(obj.stats['amountTotals']['Credit'])
-    print 'Total autopay started | {}'.format(obj.stats['kindCount']['StartAutopay'])
-    print '  Total autopay ended | {}'.format(obj.stats['kindCount']['EndAutopay'])
+    print '   Total debit amount | ${}'.format(obj.aggregate['amountTotals']['Debit'])
+    print '  Total credit amount | ${}'.format(obj.aggregate['amountTotals']['Credit'])
+    print 'Total autopay started | {}'.format(obj.aggregate['autopayCount']['StartAutopay'])
+    print '  Total autopay ended | {}'.format(obj.aggregate['autopayCount']['EndAutopay'])
     print '---------------------------------------------------------------------------'
 
     user = obj.users.get('2456938384156277127')
