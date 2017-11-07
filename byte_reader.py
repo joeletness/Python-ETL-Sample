@@ -8,39 +8,22 @@ BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 class MPS7Data(object):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, file_name):
         self.records = []
-        self.file_path = get_file_path(args[0]) if args else None
+        self.users = {}
+        self.file_path = os.path.join(BASE_DIR, file_name)
         self.stats = {
             'kindCount': {
-                'Debit': 0,
-                'Credit': 0,
                 'StartAutopay': 0,
                 'EndAutopay': 0
             },
             'amountTotals': {
                 'Debit': float_to_currency(0.0),
                 'Credit': float_to_currency(0.0),
-            },
-            'users': {}
+            }
         }
 
-    def update_stats(self, record):
-        user = self.upsert_user(record)
-        kind = record.get_kind()
-        self.stats['kindCount'][kind] += 1
-        if kind in ('Credit', 'Debit'):
-            self.stats['amountTotals'][kind] += record.get_amount()
-            user.accumulate_amount(kind, record.get_amount())
-
-    def upsert_user(self, record):
-        user_id = str(record.get_user_id())
-        user = self.stats['users'].get(user_id)
-        if not user:
-            self.stats['users'][user_id] = user = User(user_id)
-        return user
-
-    def read_data_from_file(self):
+    def extract_and_transform(self):
         _file = open(self.file_path, 'rb')
         _bytes = _file.read()
 
@@ -56,11 +39,73 @@ class MPS7Data(object):
 
         _file.close()
 
+    def update_stats(self, record):
+        user = self.upsert_user(record)
+        kind = record.get_kind()
 
-def next_record_at(current_position, record_kind):
-    if record_kind in ('Credit', 'Debit'):
-        return current_position + 21
-    return current_position + 13
+        if kind in ('StartAutopay', 'EndAutopay'):
+            self.stats['kindCount'][kind] += 1
+
+        if kind in ('Credit', 'Debit'):
+            self.stats['amountTotals'][kind] += record.get_amount()
+            user.accumulate_amount(kind, record.get_amount())
+
+    def upsert_user(self, record):
+        user_id = str(record.get_user_id())
+        user = self.users.get(user_id)
+        if not user:
+            self.users[user_id] = user = User(user_id)
+        return user
+
+
+class Record(object):
+    def __init__(self, chunks=None, index=None):
+        self.index = index
+        if chunks:
+            self.chunks = {
+                'kind': chunks[0],
+                'timestamp': chunks[1],
+                'user_id': chunks[2],
+                'amount': chunks[3],
+            }
+        else:
+            self.chunks = {}
+
+    def unpack_kind(self):
+        packed = self.chunks.get('kind')
+        return unpack('b', packed)[0] if packed else None
+
+    def unpack_timestamp(self):
+        packed = self.chunks.get('timestamp')
+        return unpack('>I', packed)[0] if packed else None
+
+    def unpack_user_id(self):
+        packed = self.chunks.get('user_id')
+        return unpack('>Q', packed)[0] if packed else None
+
+    def unpack_amount(self):
+        packed = self.chunks.get('amount')
+        return unpack('>d', packed)[0] if packed else None
+
+    def get_kind(self):
+        _kind = self.unpack_kind()
+        return (
+            'Debit',
+            'Credit',
+            'StartAutopay',
+            'EndAutopay'
+        )[_kind]
+
+    def get_timestamp(self):
+        if self.unpack_timestamp():
+            return datetime.fromtimestamp(self.unpack_timestamp())
+
+    def get_user_id(self):
+        return self.unpack_user_id()
+
+    def get_amount(self):
+        amount = self.unpack_amount()
+        return float_to_currency(amount) if amount else None
 
 
 class User(object):
@@ -80,64 +125,6 @@ class User(object):
         return self.credit_sum - self.debit_sum
 
 
-class Record(object):
-    def __init__(self, chunks=None, index=None):
-        self.index = index
-        if chunks:
-            self.chunks = {
-                'kind': chunks[0],
-                'timestamp': chunks[1],
-                'user_id': chunks[2],
-                'amount': chunks[3],
-            }
-        else:
-            self.chunks = {}
-
-    def get_timestamp(self):
-        if self.unpack_timestamp():
-            return datetime.fromtimestamp(self.unpack_timestamp())
-
-    @property
-    def is_transaction(self):
-        return self.get_kind() in ('Credit', 'Debit')
-
-    def get_kind(self):
-        _kind = self.unpack_kind()
-        return (
-            'Debit',
-            'Credit',
-            'StartAutopay',
-            'EndAutopay'
-        )[_kind]
-
-    def get_amount(self):
-        amount = self.unpack_amount()
-        return float_to_currency(amount) if amount else None
-
-    def get_user_id(self):
-        return self.unpack_user_id()
-
-    def unpack_kind(self):
-        packed = self.chunks.get('kind')
-        return unpack('b', packed)[0] if packed else None
-
-    def unpack_timestamp(self):
-        packed = self.chunks.get('timestamp')
-        return unpack('>I', packed)[0] if packed else None
-
-    def unpack_user_id(self):
-        packed = self.chunks.get('user_id')
-        return unpack('>Q', packed)[0] if packed else None
-
-    def unpack_amount(self):
-        packed = self.chunks.get('amount')
-        return unpack('>d', packed)[0] if packed else None
-
-
-def get_file_path(file_name):
-    return os.path.join(BASE_DIR, file_name)
-
-
 def get_chunks(_bytes, start, *args):
     result = []
     for index, size in enumerate(args):
@@ -148,6 +135,12 @@ def get_chunks(_bytes, start, *args):
         result.append(_byte)
         start += size
     return result
+
+
+def next_record_at(current_position, record_kind):
+    if record_kind in ('Credit', 'Debit'):
+        return current_position + 21
+    return current_position + 13
 
 
 def float_to_currency(value):
@@ -166,9 +159,9 @@ def format_readable_data_row(record):
     return result
 
 
-def main(show_table=False):
+def main(show_table=True):
     obj = MPS7Data('data.dat')
-    obj.read_data_from_file()
+    obj.extract_and_transform()
 
     if show_table:
         print '---------------------------------------------------------------------------'
@@ -184,7 +177,7 @@ def main(show_table=False):
     print '  Total autopay ended | {}'.format(obj.stats['kindCount']['EndAutopay'])
     print '---------------------------------------------------------------------------'
 
-    user = obj.stats['users'].get('2456938384156277127')
+    user = obj.users.get('2456938384156277127')
     print 'Balance for User 2456938384156277127 is ${}'.format(user.current_balance)
 
 
