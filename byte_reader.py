@@ -163,7 +163,7 @@ class NotMPS7Error(Exception):
     pass
 
 
-def main(file_name):
+def main(file_name, _user_id=None):
     obj = None
     try:
         obj = MPS7(file_name)
@@ -184,13 +184,17 @@ def main(file_name):
         print '  Total credit amount | ${}'.format(obj.aggregate['amountTotals']['Credit'])
         print 'Total autopay started | {}'.format(obj.aggregate['autopayCount']['StartAutopay'])
         print '  Total autopay ended | {}'.format(obj.aggregate['autopayCount']['EndAutopay'])
-        print '---------------------------------------------------------------------------'
 
-        user = obj.users.get('2456938384156277127')
-        print 'Balance for User 2456938384156277127 is ${}'.format(user.current_balance)
+        if _user_id:
+            print '---------------------------------------------------------------------------'
+            user = obj.users.get(_user_id)
+            print 'Balance for User {} is ${}'.format(_user_id, user.current_balance)
+
+        print '---------------------------------------------------------------------------'
 
 
 if __name__ == '__main__':
-    file_name = os.sys.argv[1] if len(os.sys.argv) > 1 else None
-    assert file_name, 'Data filename is required'
-    main(file_name)
+    filename = os.sys.argv[1] if len(os.sys.argv) > 1 else None
+    user_id = os.sys.argv[2] if len(os.sys.argv) > 2 else None
+    assert filename, 'Data filename is required'
+    main(filename, user_id)
