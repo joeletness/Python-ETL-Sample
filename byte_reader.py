@@ -27,10 +27,12 @@ class MPS7(object):
     def _extract_transform_load(self):
         open_file = open(self.file_path, 'rb')
         bytes_ = open_file.read()
-        data_format = ''.join(unpack('4c', bytes_[0:4]))
-        assert data_format == 'MPS7', 'Data must be MPS7'
 
-        start_byte = 9
+        check_magic_byte(bytes_)
+
+        first_byte_of_logs = 9
+
+        start_byte = first_byte_of_logs
         while True:
             chunks = get_chunks(bytes_, start_byte, 1, 4, 8, 8)
             if not chunks:
@@ -117,6 +119,12 @@ class User(object):
         return self.credit_sum - self.debit_sum
 
 
+def check_magic_byte(bytes_):
+    magic_byte = ''.join(unpack('4c', bytes_[0:4]))
+    if magic_byte != 'MPS7':
+        raise NotMPS7Error
+
+
 def get_chunks(_bytes, start, *args):
     result = []
     for index, size in enumerate(args):
@@ -151,27 +159,38 @@ def format_readable_data_row(log_entry):
     return result
 
 
+class NotMPS7Error(Exception):
+    pass
+
+
 def main(file_name):
-    obj = MPS7(file_name)
+    obj = None
+    try:
+        obj = MPS7(file_name)
+    except NotMPS7Error:
+        print 'ERROR ++++ Given data must be "MSP7" ++++'
+    except IOError:
+        print 'ERROR ++++ File "{}" cannot be opened ++++'.format(file_name)
 
-    print '---------------------------------------------------------------------------'
-    print 'byte  | kind          | timestamp           | user_id              | amt'
-    print '---------------------------------------------------------------------------'
-    for log_entry in obj.log_entries:
-        print format_readable_data_row(log_entry)
+    if obj:
+        print '---------------------------------------------------------------------------'
+        print 'byte  | kind          | timestamp           | user_id              | amt'
+        print '---------------------------------------------------------------------------'
+        for log_entry in obj.log_entries:
+            print format_readable_data_row(log_entry)
 
-    print '---------------------------------------------------------------------------'
-    print '   Total debit amount | ${}'.format(obj.aggregate['amountTotals']['Debit'])
-    print '  Total credit amount | ${}'.format(obj.aggregate['amountTotals']['Credit'])
-    print 'Total autopay started | {}'.format(obj.aggregate['autopayCount']['StartAutopay'])
-    print '  Total autopay ended | {}'.format(obj.aggregate['autopayCount']['EndAutopay'])
-    print '---------------------------------------------------------------------------'
+        print '---------------------------------------------------------------------------'
+        print '   Total debit amount | ${}'.format(obj.aggregate['amountTotals']['Debit'])
+        print '  Total credit amount | ${}'.format(obj.aggregate['amountTotals']['Credit'])
+        print 'Total autopay started | {}'.format(obj.aggregate['autopayCount']['StartAutopay'])
+        print '  Total autopay ended | {}'.format(obj.aggregate['autopayCount']['EndAutopay'])
+        print '---------------------------------------------------------------------------'
 
-    user = obj.users.get('2456938384156277127')
-    print 'Balance for User 2456938384156277127 is ${}'.format(user.current_balance)
+        user = obj.users.get('2456938384156277127')
+        print 'Balance for User 2456938384156277127 is ${}'.format(user.current_balance)
 
 
 if __name__ == '__main__':
-    filename = os.sys.argv[1] if len(os.sys.argv) > 1 else None
-    assert filename, 'Data filename is required'
-    main(filename)
+    file_name = os.sys.argv[1] if len(os.sys.argv) > 1 else None
+    assert file_name, 'Data filename is required'
+    main(file_name)

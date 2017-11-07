@@ -4,8 +4,8 @@ import time
 from datetime import datetime
 from struct import pack
 from decimal import Decimal
-from byte_reader import MPS7, LogEntry, get_chunks, float_to_currency, User
-from byte_reader import next_log_entry_at, main, format_readable_data_row
+from byte_reader import MPS7, NotMPS7Error, LogEntry, get_chunks, float_to_currency, User
+from byte_reader import next_log_entry_at, main, format_readable_data_row, check_magic_byte
 
 
 class TestMPS7Integration(TestCase):
@@ -99,6 +99,17 @@ class TestUser(TestCase):
         user.accumulate_amount('Credit', 100)
         user.accumulate_amount('Debit', 50)
         assert user.current_balance == 50
+
+
+def test_check_magic_byte__when_not_msp7__raise_execption():
+    fake_bytes = 'wrng'
+    with pytest.raises(NotMPS7Error):
+        check_magic_byte(fake_bytes)
+
+
+def test_check_magic_byte__when_msp7__do_nothing():
+    fake_bytes = pack('4c', 'M', 'P', 'S', '7')
+    check_magic_byte(fake_bytes)
 
 
 def test_get_chunks__when_passed_blob_with_start_and_chunk_size__return_chunks():
