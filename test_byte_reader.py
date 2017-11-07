@@ -1,11 +1,8 @@
 from unittest import TestCase
 import pytest
 import time
-from datetime import datetime
 from struct import pack
-from decimal import Decimal
-from byte_reader import MPS7, NotMPS7Error, LogEntry, get_chunks, float_to_currency, User
-from byte_reader import next_log_entry_at, main, format_readable_data_row, check_magic_byte
+from byte_reader import *
 
 
 class TestMPS7Integration(TestCase):
@@ -13,12 +10,12 @@ class TestMPS7Integration(TestCase):
         with pytest.raises(IOError):
             MPS7('not-found.dat')
 
-    def test__extract_transform_load__when_data_is_mps7__read_data_populate_log_entrys_and_users(self):
+    def test__extract_transform_load__when_data_is_mps7__read_data_populate_log_entries_and_users(self):
         obj = MPS7('data.dat')
         assert len(obj.log_entries) == 72
         assert len(obj.users) == 62
 
-    def test_update_aggregate__counts_occurrences_of_start_and_end_autopay_log_entrys(self):
+    def test_update_aggregate__counts_occurrences_of_start_and_end_autopay_log_entries(self):
         obj = MPS7('data.dat')
         assert obj.aggregate['autopayCount']['StartAutopay'] == 10
         assert obj.aggregate['autopayCount']['EndAutopay'] == 8
