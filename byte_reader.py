@@ -33,7 +33,7 @@ class MPS7Data(object):
             if not chunks:
                 break
             record = Record(chunks, idx)
-            idx = next_record_at(idx, record.get_kind())
+            idx = next_record_at(idx, record.kind)
             self.update_stats(record)
             self.records.append(record)
 
@@ -41,17 +41,17 @@ class MPS7Data(object):
 
     def update_stats(self, record):
         user = self.upsert_user(record)
-        kind = record.get_kind()
+        kind = record.kind
 
         if kind in ('StartAutopay', 'EndAutopay'):
             self.stats['kindCount'][kind] += 1
 
         if kind in ('Credit', 'Debit'):
-            self.stats['amountTotals'][kind] += record.get_amount()
-            user.accumulate_amount(kind, record.get_amount())
+            self.stats['amountTotals'][kind] += record.amount
+            user.accumulate_amount(kind, record.amount)
 
     def upsert_user(self, record):
-        user_id = str(record.get_user_id())
+        user_id = str(record.user_id)
         user = self.users.get(user_id)
         if not user:
             self.users[user_id] = user = User(user_id)
@@ -87,7 +87,8 @@ class Record(object):
         packed = self.chunks.get('amount')
         return unpack('>d', packed)[0] if packed else None
 
-    def get_kind(self):
+    @property
+    def kind(self):
         _kind = self.unpack_kind()
         return (
             'Debit',
@@ -96,16 +97,17 @@ class Record(object):
             'EndAutopay'
         )[_kind]
 
-    def get_timestamp(self):
-        if self.unpack_timestamp():
-            return datetime.fromtimestamp(self.unpack_timestamp())
+    @property
+    def timestamp(self):
+        return datetime.fromtimestamp(self.unpack_timestamp())
 
-    def get_user_id(self):
+    @property
+    def user_id(self):
         return self.unpack_user_id()
 
-    def get_amount(self):
-        amount = self.unpack_amount()
-        return float_to_currency(amount) if amount else None
+    @property
+    def amount(self):
+        return float_to_currency(self.unpack_amount())
 
 
 class User(object):
@@ -151,10 +153,10 @@ def format_readable_data_row(record):
     template = '{} | {} | {} | {} | {}'
     result = template.format(
         str(record.index).rjust(5),
-        record.get_kind().ljust(13),
-        record.get_timestamp(),
-        str(record.get_user_id()).ljust(20),
-        str(record.get_amount()).rjust(6)
+        record.kind.ljust(13),
+        record.timestamp,
+        str(record.user_id).ljust(20),
+        str(record.amount).rjust(6)
     )
     return result
 

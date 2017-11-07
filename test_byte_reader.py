@@ -73,36 +73,28 @@ class TestRecord(TestCase):
         record.chunks['amount'] = pack('>d', 42.473264)
         assert record.unpack_amount() == 42.473264
 
-    def test_get_kind__return_readable_value(self):
+    def test_kind_property__return_readable_value(self):
         record = Record()
         record.chunks['kind'] = pack('b', 0)
-        assert 'Debit' in record.get_kind()
+        assert record.kind == 'Debit'
 
-    def test_get_timestamp__when_no_data__return_none(self):
-        record = Record()
-        assert record.get_timestamp() is None
-
-    def test_get_timestamp__when_data__return_expected_timestamp(self):
+    def test_timestamp_property__return_expected_datetime_object(self):
         expected = datetime(2017, 11, 5)
         fake_timestamp_int = int(time.mktime(expected.timetuple()))
         record = Record()
         record.chunks['timestamp'] = pack('>I', fake_timestamp_int)
-        assert record.get_timestamp() == expected
+        assert record.timestamp == expected
 
-    def test_get_user_id__when_no_data__return_none(self):
+    def test_user_id_property__return_user_id_int(self):
         record = Record()
         record.chunks['user_id'] = pack('>Q', 2456938384156277127)
-        assert record.get_user_id() == 2456938384156277127
+        assert record.user_id == 2456938384156277127
 
-    def test_get_amount__when_no_data__return_none(self):
-        record = Record()
-        assert record.get_amount() is None
-
-    def test_get_amount__when_data__return_decimal_value(self):
+    def test_amount_property__return_decimal_value(self):
         record = Record()
         record.chunks['kind'] = pack('b', 1)
         record.chunks['amount'] = pack('>d', 42.4)
-        assert record.get_amount() == Decimal('42.40')
+        assert record.amount == Decimal('42.40')
 
 
 class TestUser(TestCase):
@@ -170,5 +162,5 @@ def test_format_readable_data_row():
     assert result == expected
 
 
-def test_main():
-    main(True)
+# def test_main():
+#     main(True)
