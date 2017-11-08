@@ -7,12 +7,12 @@ Read and deserialize transaction log data from a fictional proprietary binary fo
 Clone this repo. It can be run in two modes:
 1. Display the full list of records and summary.
     ```bash
-    $ python byte-reader data.dat
+    $ python mps7_reader.py data.dat
     
     ```
 2. Display the balance for a specific user by passing a user id.
     ```bash
-    $ python byte-reader data.dat 2456938384156277127
+    $ python mps7_reader.py data.dat 2456938384156277127
     
     ```
 Note: PyTest is required to run the unit tests `$ pip install pytest`
@@ -28,7 +28,7 @@ Note: PyTest is required to run the unit tests `$ pip install pytest`
 ### ETL Behavior
 According to my interpretation of the given log specification, I would expect the first nine bytes of data to represent the header while the rest of the data contained all of the records in lengths of either 13 or 21 bytes depending on if the log entry was for starting/stopping autopay or debit/credit, respectively.
 
-### The algorithm for deserializing log data
+### Deserialization Algorithm
 - Starting from the first byte of log content, consume each log until EOF:
   - IF debit/credit:
     - Read timestamp (4 bytes at start + 1)

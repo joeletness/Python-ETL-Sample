@@ -2,7 +2,7 @@ from unittest import TestCase
 import pytest
 import time
 from struct import pack
-from byte_reader import *
+from mps7_reader import *
 
 
 class TestMPS7Integration(TestCase):

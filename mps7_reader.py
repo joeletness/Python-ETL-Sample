@@ -56,25 +56,22 @@ class MPS7(object):
             user.accumulate_amount(kind, log_entry.amount)
 
     def upsert_user(self, log_entry):
-        user_id = str(log_entry.user_id)
-        user = self.users.get(user_id)
+        user_id_ = str(log_entry.user_id)
+        user = self.users.get(user_id_)
         if not user:
-            self.users[user_id] = user = User(user_id)
+            self.users[user_id_] = user = User(user_id_)
         return user
 
 
 class LogEntry(object):
     def __init__(self, chunks=None, index=None):
         self.index = index
-        if chunks:
-            self.chunks = {
+        self.chunks = {
                 'kind': chunks[0],
                 'timestamp': chunks[1],
                 'user_id': chunks[2],
                 'amount': chunks[3],
-            }
-        else:
-            self.chunks = {}
+            } if chunks else {}
 
     @property
     def kind(self):
