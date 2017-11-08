@@ -17,6 +17,8 @@ Clone this repo. It can be run in two modes:
     ```
 Note: PyTest is required to run the unit tests `$ pip install pytest`
 
+## Architecture
+
 ### Objects
 - MPS7 _(controller)_
   - Responsible for collecting and storing LogEntry and User data along with accumulating aggregation info
