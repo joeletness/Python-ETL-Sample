@@ -171,22 +171,20 @@ def main(file_name, _user_id=None):
 
     if obj:
         print '---------------------------------------------------------------------------'
-        print 'byte  | kind          | timestamp           | user_id              | amt'
-        print '---------------------------------------------------------------------------'
-        for log_entry in obj.log_entries:
-            print format_readable_data_row(log_entry)
-
-        print '---------------------------------------------------------------------------'
-        print '   Total debit amount | ${}'.format(obj.aggregate['amountTotals']['Debit'])
-        print '  Total credit amount | ${}'.format(obj.aggregate['amountTotals']['Credit'])
-        print 'Total autopay started | {}'.format(obj.aggregate['autopayCount']['StartAutopay'])
-        print '  Total autopay ended | {}'.format(obj.aggregate['autopayCount']['EndAutopay'])
-
         if _user_id:
-            print '---------------------------------------------------------------------------'
             user = obj.users.get(_user_id)
             print 'Balance for User {} is ${}'.format(_user_id, user.current_balance)
+        else:
+            print 'byte  | kind          | timestamp           | user_id              | amt'
+            print '---------------------------------------------------------------------------'
+            for log_entry in obj.log_entries:
+                print format_readable_data_row(log_entry)
 
+            print '---------------------------------------------------------------------------'
+            print '   Total debit amount | ${}'.format(obj.aggregate['amountTotals']['Debit'])
+            print '  Total credit amount | ${}'.format(obj.aggregate['amountTotals']['Credit'])
+            print 'Total autopay started | {}'.format(obj.aggregate['autopayCount']['StartAutopay'])
+            print '  Total autopay ended | {}'.format(obj.aggregate['autopayCount']['EndAutopay'])
         print '---------------------------------------------------------------------------'
 
 
