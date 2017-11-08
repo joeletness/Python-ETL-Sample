@@ -165,7 +165,7 @@ def main(file_name, _user_id=None):
     try:
         obj = MPS7(file_name)
     except NotMPS7Error:
-        print 'ERROR ++++ Given data must be "MSP7" ++++'
+        print 'ERROR ++++ Given data must be "MPS7" ++++'
     except IOError:
         print 'ERROR ++++ File "{}" cannot be opened ++++'.format(file_name)
 
