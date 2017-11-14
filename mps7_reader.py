@@ -10,7 +10,7 @@ BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 class MPS7(object):
     def __init__(self, file_name):
         self.data_length = 0
-        self.errors = []
+        self.error = ''
         self.log_entries = []
         self.users = {}
         self.file_path = os.path.join(BASE_DIR, file_name)
@@ -50,8 +50,8 @@ class MPS7(object):
                 self.log_entries.append(log_entry)
 
         if count > self.data_length:
-            error_template = 'Error: Expected length to be {}. Actual length {}. Dropping overrun.'
-            self.errors.append(error_template.format(self.data_length, count))
+            error_template = 'Expected length to be {}. Actual length {}. Dropping overrun.'
+            self.error = error_template.format(self.data_length, count)
 
         open_file.close()
 
@@ -200,6 +200,10 @@ def main(file_name, _user_id=None):
             print '  Total credit amount | ${}'.format(obj.aggregate['amountTotals']['Credit'])
             print 'Total autopay started | {}'.format(obj.aggregate['autopayCount']['StartAutopay'])
             print '  Total autopay ended | {}'.format(obj.aggregate['autopayCount']['EndAutopay'])
+
+            if obj.error:
+                print '---------------------------------------------------------------------------'
+                print '!!! ERROR !!! {}'.format(obj.error)
         print '---------------------------------------------------------------------------'
 
 

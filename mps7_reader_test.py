@@ -19,7 +19,7 @@ class TestMPS7Integration(TestCase):
 
     def test__extract_transform_load__when_length_is_overrun__record_error_and_drop_overrun(self):
         obj = MPS7(FIXTURE_FILENAME)
-        assert obj.errors[0] == 'Error: Expected length to be 71. Actual length 72. Dropping overrun.'
+        assert obj.error == 'Expected length to be 71. Actual length 72. Dropping overrun.'
         assert len(obj.log_entries) == 71
 
     def test_update_aggregate__counts_occurrences_of_start_and_end_autopay_log_entries(self):
