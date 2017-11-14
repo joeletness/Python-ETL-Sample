@@ -29,6 +29,7 @@ class MPS7(object):
     def _extract_transform_load(self):
         open_file = open(self.file_path, 'rb')
         bytes_ = open_file.read()
+        open_file.close()
 
         check_magic_byte(bytes_)
         self.data_length = get_data_length(bytes_)
@@ -52,8 +53,6 @@ class MPS7(object):
         if count > self.data_length:
             error_template = 'Expected length to be {}. Actual length {}. Dropping overrun.'
             self.error = error_template.format(self.data_length, count)
-
-        open_file.close()
 
     def update_aggregate(self, log_entry):
         user = self.upsert_user(log_entry)

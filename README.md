@@ -3,7 +3,7 @@
 ## Summery
 Read and deserialize transaction log data from a fictional proprietary binary format and marshal it into a data structure that can be used for further processing. Specific to this exercise is the ability to answer questions regarding total amounts of debit/credits, counting autopay events, and to display the balance for a specific user:
 
-This is intended to demonstrate the following techniques:
+This is intended to demonstrate the following:
 - Test-first TDD
 - Refactoring for Readability
 - Modular architecture
@@ -54,7 +54,7 @@ According to my interpretation of the given log specification, I would expect th
     - Determine the next log entry’s start position (start + 13)
     - Create and store Record and User
 
-### Assumptions
+### Notes and Assumptions
  - According the the header, the expected count of records should be 71. However, there are actually 72. Since I can’t find any indication that my extraction algorithm is incorrect and after extensive manual inspection of the data and I haven't been able to find any indication that any particular record is in error (e.g. duplicate), ~~I’m going going to worry about it just pretend that it’s an “off by one” error systemic to the legacy system.~~ After additional clarification from the author of the exercise, it is expected that the legacy system may produce overruns and that it's acceptable to ignore them while indicating the error. This behavior has been implemented.
  - Some of the data is not what I would expect. For instance there are eight users who have simultaneous log entries with both a credit and debit in the same amount (net $0.00). This seems odd but since I don’t know anything about the origin data I’m going to assume that it’s just fine.
  - According to the specification the data is a log. I would have expected the log to be in chronological order but it is not. Again, since I don’t know anything about how this data was serialized, I’m going to assume that that’s perfectly normal.
