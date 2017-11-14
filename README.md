@@ -3,6 +3,15 @@
 ## Summery
 Read and deserialize transaction log data from a fictional proprietary binary format and marshal it into a data structure that can be used for further processing. Specific to this exercise is the ability to answer questions regarding total amounts of debit/credits, counting autopay events, and to display the balance for a specific user:
 
+This is intended to demonstrate the following techniques:
+- Test-first TDD
+- Refactoring and Readability
+- Modular architecture
+- Encapsulation/Separation Of Concerns
+- Clean Code/Clean Architecture
+- Documentation
+
+
 ### How it works
 Clone this repo. It can be run in two modes:
 1. Display the full list of records and summary.
@@ -15,7 +24,8 @@ Clone this repo. It can be run in two modes:
     $ python mps7_reader.py data.dat 2456938384156277127
     
     ```
-Note: PyTest is required to run the unit tests `$ pip install pytest`
+- __PyTest__ is required if you want to run the unit tests `$ pip install pytest`
+  - NOTE: Since this is an just an exercise I'm using the sample binary data as if it were a static fixure for the unit tests.
 
 ## Architecture
 
@@ -52,7 +62,7 @@ According to my interpretation of the given log specification, I would expect th
 ### Questions/Answers
 1. _What is the total amount in dollars of debits?_ __$18203.69__
 2. _What is the total amount in dollars of credits?_ __$10073.34__
-3. _how many autopays were started?_ __Ten__
+3. _ow many autopays were started?_ __Ten__
 4. _How many autopays were ended?_ __Eight__
 5. _What is balance of user ID 2456938384156277127?_ __$0.00__
 

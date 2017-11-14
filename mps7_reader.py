@@ -122,6 +122,10 @@ def check_magic_byte(bytes_):
         raise NotMPS7Error
 
 
+def get_data_length(bytes_):
+    return unpack('>I', bytes_[5:9])[0]
+
+
 def get_chunks(_bytes, start, *args):
     result = []
     for index, size in enumerate(args):
