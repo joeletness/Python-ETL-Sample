@@ -4,6 +4,8 @@ import time
 from struct import pack
 from mps7_reader import *
 
+FIXTURE_FILENAME = 'data.dat'
+
 
 class TestMPS7Integration(TestCase):
     def test__extract_transform_load__when_file_is_not_found__raise_exception(self):
@@ -11,31 +13,35 @@ class TestMPS7Integration(TestCase):
             MPS7('not-found.dat')
 
     def test__extract_transform_load__when_data_is_mps7__read_data_populate_log_entries_and_users(self):
-        obj = MPS7('data.dat')
-        assert len(obj.log_entries) == 72
+        obj = MPS7(FIXTURE_FILENAME)
+        assert obj.data_length == 71
         assert len(obj.users) == 62
 
+    def test__extract_transform_load__when_length_is_overrun__record_error_and_drop_overrun(self):
+        obj = MPS7(FIXTURE_FILENAME)
+        assert obj.error == 'Expected length to be 71. Actual length 72. Dropping overrun.'
+        assert len(obj.log_entries) == 71
+
     def test_update_aggregate__counts_occurrences_of_start_and_end_autopay_log_entries(self):
-        obj = MPS7('data.dat')
+        obj = MPS7(FIXTURE_FILENAME)
         assert obj.aggregate['autopayCount']['StartAutopay'] == 10
         assert obj.aggregate['autopayCount']['EndAutopay'] == 8
 
-    def test_update_aggregate__accumulates_credits_and_debits(self):
-        obj = MPS7('data.dat')
-        assert obj.aggregate['amountTotals']['Credit'] == Decimal('10073.34')
-        assert obj.aggregate['amountTotals']['Debit'] == Decimal('18203.69')
+    def test_update_aggregate__accumulates_credits(self):
+        obj = MPS7(FIXTURE_FILENAME)
+        assert obj.aggregate['amountTotals']['Credit'] == Decimal('9366.00')
 
     def test_update_aggregate__accumulates_debits(self):
-        obj = MPS7('data.dat')
+        obj = MPS7(FIXTURE_FILENAME)
         assert obj.aggregate['amountTotals']['Debit'] == Decimal('18203.69')
 
     def test_update_aggregate__accumulates_users_debits_and_credits(self):
-        obj = MPS7('data.dat')
+        obj = MPS7(FIXTURE_FILENAME)
         user = obj.users.get('3018469034978866138')
         assert user.current_balance == Decimal('154.66')
 
     def test_upsert_user__inserts_user_object_in_stats(self):
-        obj = MPS7('data.dat')
+        obj = MPS7(FIXTURE_FILENAME)
         assert isinstance(obj.users.get('3018469034978866138'), User)
 
 
@@ -109,6 +115,11 @@ def test_check_magic_byte__when_msp7__do_nothing():
     check_magic_byte(fake_bytes)
 
 
+def test_get_data_length():
+    fake_bytes = pack('4cbI', 'M', 'P', 'S', '7', 1, 25)
+    assert get_data_length(fake_bytes) == 25
+
+
 def test_get_chunks__when_passed_blob_with_start_and_chunk_size__return_chunks():
     blob = 'pearcowtomatotunabeeorange'
     start_index = 0
@@ -141,7 +152,7 @@ def test_float_to_currency__converts_float_to_decimal_with_two_places():
 
 
 def test_format_readable_data_row__return_readable_data_row_for_output():
-    obj = MPS7('data.dat')
+    obj = MPS7(FIXTURE_FILENAME)
     result = format_readable_data_row(obj.log_entries[0])
     expected = '    9 | Debit         | 2014-02-22 16:42:25 | 4136353673894269217  | 604.27'
     assert result == expected

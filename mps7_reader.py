@@ -9,6 +9,8 @@ BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class MPS7(object):
     def __init__(self, file_name):
+        self.data_length = 0
+        self.error = ''
         self.log_entries = []
         self.users = {}
         self.file_path = os.path.join(BASE_DIR, file_name)
@@ -29,18 +31,27 @@ class MPS7(object):
         bytes_ = open_file.read()
 
         check_magic_byte(bytes_)
-
+        self.data_length = get_data_length(bytes_)
+        
         first_byte_of_logs = 9
 
+        count = 0
         start_byte = first_byte_of_logs
         while True:
             chunks = get_chunks(bytes_, start_byte, 1, 4, 8, 8)
             if not chunks:
                 break
+
+            count += 1
             log_entry = LogEntry(chunks, start_byte)
             start_byte = next_log_entry_at(start_byte, log_entry.kind)
-            self.update_aggregate(log_entry)
-            self.log_entries.append(log_entry)
+            if count <= self.data_length:
+                self.update_aggregate(log_entry)
+                self.log_entries.append(log_entry)
+
+        if count > self.data_length:
+            error_template = 'Expected length to be {}. Actual length {}. Dropping overrun.'
+            self.error = error_template.format(self.data_length, count)
 
         open_file.close()
 
@@ -122,6 +133,10 @@ def check_magic_byte(bytes_):
         raise NotMPS7Error
 
 
+def get_data_length(bytes_):
+    return unpack('>I', bytes_[5:9])[0]
+
+
 def get_chunks(_bytes, start, *args):
     result = []
     for index, size in enumerate(args):
@@ -185,6 +200,10 @@ def main(file_name, _user_id=None):
             print '  Total credit amount | ${}'.format(obj.aggregate['amountTotals']['Credit'])
             print 'Total autopay started | {}'.format(obj.aggregate['autopayCount']['StartAutopay'])
             print '  Total autopay ended | {}'.format(obj.aggregate['autopayCount']['EndAutopay'])
+
+            if obj.error:
+                print '---------------------------------------------------------------------------'
+                print '!!! ERROR !!! {}'.format(obj.error)
         print '---------------------------------------------------------------------------'
 
 
