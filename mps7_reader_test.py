@@ -14,7 +14,7 @@ class TestMPS7Integration(TestCase):
 
     def test__extract_transform_load__when_data_is_mps7__read_data_populate_log_entries_and_users(self):
         obj = MPS7(FIXTURE_FILENAME)
-        assert len(obj.log_entries) == 72
+        assert obj.data_length == 71
         assert len(obj.users) == 62
 
     def test_update_aggregate__counts_occurrences_of_start_and_end_autopay_log_entries(self):

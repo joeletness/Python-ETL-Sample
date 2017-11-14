@@ -9,6 +9,7 @@ BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 class MPS7(object):
     def __init__(self, file_name):
+        self.data_length = 0
         self.log_entries = []
         self.users = {}
         self.file_path = os.path.join(BASE_DIR, file_name)
@@ -29,7 +30,8 @@ class MPS7(object):
         bytes_ = open_file.read()
 
         check_magic_byte(bytes_)
-
+        self.data_length = get_data_length(bytes_)
+        
         first_byte_of_logs = 9
 
         start_byte = first_byte_of_logs
