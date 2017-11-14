@@ -27,11 +27,9 @@ class TestMPS7Integration(TestCase):
         assert obj.aggregate['autopayCount']['StartAutopay'] == 10
         assert obj.aggregate['autopayCount']['EndAutopay'] == 8
 
-    @pytest.mark.skip('Expectation is stale and needs to be recalculated.')
-    def test_update_aggregate__accumulates_credits_and_debits(self):
+    def test_update_aggregate__accumulates_credits(self):
         obj = MPS7(FIXTURE_FILENAME)
-        assert obj.aggregate['amountTotals']['Credit'] == Decimal('10073.34')
-        assert obj.aggregate['amountTotals']['Debit'] == Decimal('18203.69')
+        assert obj.aggregate['amountTotals']['Credit'] == Decimal('9366.00')
 
     def test_update_aggregate__accumulates_debits(self):
         obj = MPS7(FIXTURE_FILENAME)
