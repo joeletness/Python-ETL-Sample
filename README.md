@@ -5,7 +5,7 @@ Read and deserialize transaction log data from a fictional proprietary binary fo
 
 This is intended to demonstrate the following techniques:
 - Test-first TDD
-- Refactoring and Readability
+- Refactoring for Readability
 - Modular architecture
 - Encapsulation/Separation Of Concerns
 - Clean Code/Clean Architecture
@@ -55,14 +55,14 @@ According to my interpretation of the given log specification, I would expect th
     - Create and store Record and User
 
 ### Assumptions
- - According the the header, the expected count of records should be 71. However, there are actually 72. Since I can’t find any indication that my extraction algorithm is incorrect and after extensive manual inspection of the data, I’m going to assume that it’s an “off by one” error systemic to the legacy system.
+ - According the the header, the expected count of records should be 71. However, there are actually 72. Since I can’t find any indication that my extraction algorithm is incorrect and after extensive manual inspection of the data and I haven't been able to find any indication that any particular record is in error (e.g. duplicate), ~~I’m going going to worry about it just pretend that it’s an “off by one” error systemic to the legacy system.~~ After additional clarification from the author of the exercise, it is expected that the legacy system may produce overruns and that it's acceptable to ignore them while indicating the error. This behavior has been implemented.
  - Some of the data is not what I would expect. For instance there are eight users who have simultaneous log entries with both a credit and debit in the same amount (net $0.00). This seems odd but since I don’t know anything about the origin data I’m going to assume that it’s just fine.
  - According to the specification the data is a log. I would have expected the log to be in chronological order but it is not. Again, since I don’t know anything about how this data was serialized, I’m going to assume that that’s perfectly normal.
 
 ### Questions/Answers
 1. _What is the total amount in dollars of debits?_ __$18203.69__
-2. _What is the total amount in dollars of credits?_ __$10073.34__
-3. _ow many autopays were started?_ __Ten__
+2. _What is the total amount in dollars of credits?_ __$9366.00__
+3. _How many autopays were started?_ __Ten__
 4. _How many autopays were ended?_ __Eight__
 5. _What is balance of user ID 2456938384156277127?_ __$0.00__
 
