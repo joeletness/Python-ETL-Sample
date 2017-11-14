@@ -10,6 +10,7 @@ BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 class MPS7(object):
     def __init__(self, file_name):
         self.data_length = 0
+        self.errors = []
         self.log_entries = []
         self.users = {}
         self.file_path = os.path.join(BASE_DIR, file_name)
@@ -34,15 +35,23 @@ class MPS7(object):
         
         first_byte_of_logs = 9
 
+        count = 0
         start_byte = first_byte_of_logs
         while True:
             chunks = get_chunks(bytes_, start_byte, 1, 4, 8, 8)
             if not chunks:
                 break
+
+            count += 1
             log_entry = LogEntry(chunks, start_byte)
             start_byte = next_log_entry_at(start_byte, log_entry.kind)
-            self.update_aggregate(log_entry)
-            self.log_entries.append(log_entry)
+            if count <= self.data_length:
+                self.update_aggregate(log_entry)
+                self.log_entries.append(log_entry)
+
+        if count > self.data_length:
+            error_template = 'Error: Expected length to be {}. Actual length {}. Dropping overrun.'
+            self.errors.append(error_template.format(self.data_length, count))
 
         open_file.close()
 
