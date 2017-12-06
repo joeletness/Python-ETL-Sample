@@ -1,5 +1,6 @@
 from unittest import TestCase
 import pytest
+from mock import patch
 import time
 from struct import pack
 from mps7_reader import *
@@ -7,12 +8,13 @@ from mps7_reader import *
 FIXTURE_FILENAME = 'data.dat'
 
 
-class TestMPS7Integration(TestCase):
-    def test__extract_transform_load__when_file_is_not_found__raise_exception(self):
-        with pytest.raises(IOError):
-            MPS7('not-found.dat')
+class TestMPS7IntegrationWithFixture(TestCase):
+    def test__MPS7_object_instantiation__invokes_extract_transform_load_method(self):
+        with patch('mps7_reader.MPS7._extract_transform_load') as mock_ETL:
+            MPS7('any-filename')
+        mock_ETL.assert_called_once()
 
-    def test__extract_transform_load__when_data_is_mps7__read_data_populate_log_entries_and_users(self):
+    def test__extract_transform_load__read_data_from_file_and_populate_log_entries_and_users(self):
         obj = MPS7(FIXTURE_FILENAME)
         assert obj.data_length == 71
         assert len(obj.users) == 62
@@ -104,10 +106,10 @@ class TestUser(TestCase):
         assert user.current_balance == 50
 
 
-def test_check_magic_byte__when_not_msp7__raise_execption():
-    fake_bytes = 'wrng'
+def test_check_magic_byte__when_not_msp7__raise_exception():
+    incorrect_magic_byte = 'nope'
     with pytest.raises(NotMPS7Error):
-        check_magic_byte(fake_bytes)
+        check_magic_byte(incorrect_magic_byte)
 
 
 def test_check_magic_byte__when_msp7__do_nothing():
@@ -152,7 +154,13 @@ def test_float_to_currency__converts_float_to_decimal_with_two_places():
 
 
 def test_format_readable_data_row__return_readable_data_row_for_output():
-    obj = MPS7(FIXTURE_FILENAME)
-    result = format_readable_data_row(obj.log_entries[0])
-    expected = '    9 | Debit         | 2014-02-22 16:42:25 | 4136353673894269217  | 604.27'
+    kind_chunk = pack('b', 0)
+    timestamp_chunk_2017_12_5 = pack('>I', 1512540000)
+    user_id_chunk = pack('>Q', 2456938384156277127)
+    amount_chunk = pack('>d', 42.4)
+    chunks = [kind_chunk, timestamp_chunk_2017_12_5, user_id_chunk, amount_chunk]
+    log_entry = LogEntry(chunks, index=1)
+
+    result = format_readable_data_row(log_entry)
+    expected = '    1 | Debit         | 2017-12-06 00:00:00 | 2456938384156277127  |  42.40'
     assert result == expected
