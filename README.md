@@ -13,7 +13,7 @@ This is intended to demonstrate the following:
 
 
 ### How it works
-Clone this repo. It can be run in two modes:
+Clone this repo. It has no functional dependencies beyond the standard python 2.7 library. It can be run in two modes:
 1. Display the full list of records and summary.
     ```bash
     $ python mps7_reader.py data.dat
@@ -24,7 +24,11 @@ Clone this repo. It can be run in two modes:
     $ python mps7_reader.py data.dat 2456938384156277127
     
     ```
-- __PyTest__ is required if you want to run the unit tests `$ pip install pytest`
+- __PyTest__ and __Mock__ are required if you wish to run the unit tests:
+    ```bash
+    $ pip install -r requirements.txt
+    $ pytest
+    ```
   - NOTE: Since this is an just an exercise I'm using the sample binary data as if it were a static fixure for the unit tests.
 
 ## Architecture
@@ -33,7 +37,7 @@ Clone this repo. It can be run in two modes:
 - MPS7 _(controller)_
   - Responsible for collecting and storing LogEntry and User data along with accumulating aggregation info
 - LogEntry _(data-model)_
-  - Responsible for transforming chunks of bytes into meaningful data that represents a log entry
+  - Responsible for transforming chunks of bytes into data that can represent a log entry
 - User _(data-model)_
   - Responsible for aggregating and reporting any specific user’s transaction amounts
 
